@@ -1,0 +1,16 @@
+{
+  "name": "warden-manual",
+  "description": "A shared example skill where Claude gets extra field notes and Codex uses the default frontmatter.",
+  "tags": [
+    "demo",
+    "manual",
+    "guidance"
+  ],
+  "targets": [
+    "claude",
+    "codex"
+  ],
+  "claude": {
+    "allowed-tools": "Read, Grep"
+  }
+}

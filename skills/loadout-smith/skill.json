@@ -1,0 +1,13 @@
+{
+  "name": "loadout-smith",
+  "description": "A shared example skill for authoring Loadout-compatible skills directly inside a managed repo.",
+  "tags": [
+    "demo",
+    "authoring",
+    "loadout"
+  ],
+  "targets": [
+    "claude",
+    "codex"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "debugging-compass",
+  "description": "A shared example skill with per-target metadata for tracing bugs through unfamiliar code.",
+  "tags": [
+    "demo",
+    "debugging",
+    "navigation"
+  ],
+  "targets": [
+    "claude",
+    "codex"
+  ],
+  "claude": {
+    "allowed-tools": "Read, Grep, Bash",
+    "compass-mode": "survey"
+  },
+  "codex": {
+    "approval-mode": "suggest"
+  }
+}

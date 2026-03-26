@@ -1,0 +1,16 @@
+{
+  "name": "bardic-review",
+  "description": "An intentional Claude-only example that demonstrates a class-restricted skill with Claude metadata.",
+  "tags": [
+    "demo",
+    "code-review",
+    "bardic"
+  ],
+  "targets": [
+    "claude"
+  ],
+  "claude": {
+    "allowed-tools": "Read, Grep",
+    "disable-model-invocation": true
+  }
+}

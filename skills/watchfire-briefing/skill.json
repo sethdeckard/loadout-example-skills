@@ -1,0 +1,13 @@
+{
+  "name": "watchfire-briefing",
+  "description": "A shared example skill that delivers a short end-of-task briefing in campfire tone.",
+  "tags": [
+    "demo",
+    "summary",
+    "briefing"
+  ],
+  "targets": [
+    "claude",
+    "codex"
+  ]
+}

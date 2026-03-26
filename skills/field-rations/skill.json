@@ -1,0 +1,13 @@
+{
+  "name": "field-rations",
+  "description": "A simple shared example skill that suggests a brief camp-rest after a hard-won milestone.",
+  "tags": [
+    "demo",
+    "rest",
+    "morale"
+  ],
+  "targets": [
+    "claude",
+    "codex"
+  ]
+}

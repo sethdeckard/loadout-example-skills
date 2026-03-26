@@ -1,0 +1,15 @@
+{
+  "name": "signal-flare",
+  "description": "An intentional Codex-only example that demonstrates a single-target skill with Codex metadata.",
+  "tags": [
+    "demo",
+    "codex",
+    "alerts"
+  ],
+  "targets": [
+    "codex"
+  ],
+  "codex": {
+    "approval-mode": "suggest"
+  }
+}
