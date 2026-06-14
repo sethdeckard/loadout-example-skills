@@ -35,6 +35,25 @@ Alias for convenience:
 LOADOUT=.tmp/loadout
 ```
 
+Loadout stores its config as TOML at `~/.config/loadout/config.toml`. Define two
+helpers to read values from it (this avoids a `jq` dependency — `awk` is
+universal):
+
+```bash
+CONFIG_TOML="$HOME/.config/loadout/config.toml"
+cfg_repo_path()   { awk -F'"' '/^[[:space:]]*repo_path[[:space:]]*=/{print $2; exit}' "$CONFIG_TOML"; }
+cfg_target_path() { awk -v sec="[targets.$1]" '
+  /^[[:space:]]*\[/ { s=$0; gsub(/^[[:space:]]+|[[:space:]]+$/, "", s) }
+  s==sec && /^[[:space:]]*path[[:space:]]*=/ { sub(/^[^=]*=[[:space:]]*/, ""); gsub(/"/, ""); print; exit }
+' "$CONFIG_TOML"; }
+```
+
+The config writer indents nested tables (`  [targets.codex]`), so the helpers
+tolerate leading whitespace on both section headers and keys.
+
+Use `cfg_repo_path` for the registry path and `cfg_target_path claude` /
+`cfg_target_path codex` for the installed-skill roots throughout the run.
+
 ## Validation Steps
 
 Work through each section in order. Every command shown is a real invocation — run it, check the output, and record pass or fail.
@@ -79,7 +98,76 @@ $LOADOUT unequip <name> --target codex
 
 Verify the skill returns to an uninstalled state.
 
-### 4. Sync
+### 4. Codex Invocation Policy
+
+Verify that a skill which disables Codex implicit invocation materializes the
+policy into `agents/openai.yaml`. This uses `signal-flare`, the Codex-only
+example skill whose `skill.json` declares
+`codex.policy.allow_implicit_invocation: false`. (This assumes the configured
+repo includes `signal-flare`, which it does when running against the
+loadout-example-skills repo.)
+
+This section equips and then unequips `signal-flare`. If it is **already
+installed** for Codex before the run, do not touch it — the cleanup at the end
+of this section would otherwise delete a pre-existing install and leave the
+environment changed. Guard first:
+
+```bash
+CODEX_ROOT=$(cfg_target_path codex)
+SF_DIR="$CODEX_ROOT/signal-flare"
+if [ -e "$SF_DIR" ]; then
+  echo "ABORT: signal-flare is already installed for codex at $SF_DIR"
+fi
+```
+
+If that prints `ABORT`, **stop the shakedown and report it as a failure.** State
+the reason: `signal-flare` was already installed for Codex, so the policy check
+was skipped to avoid disturbing a pre-existing install. Do not equip or unequip
+it. Then offer to clean up anything else this run created (the `.tmp/` build
+dir and any leftover temp fixtures), but leave the existing `signal-flare`
+install untouched. Otherwise, proceed:
+
+```bash
+$LOADOUT equip signal-flare --target codex
+```
+
+Verify the policy file was materialized:
+
+```bash
+grep -q 'allow_implicit_invocation: false' "$SF_DIR/agents/openai.yaml" && echo "policy file OK"
+```
+
+Expected: prints "policy file OK". Then verify the policy keys are kept out of
+the installed `SKILL.md` frontmatter, while ordinary Codex metadata remains:
+
+```bash
+grep -q 'approval-mode: suggest' "$SF_DIR/SKILL.md" && echo "frontmatter key OK"
+grep -qE 'policy|allow_implicit_invocation|disable-model-invocation' "$SF_DIR/SKILL.md" && echo "LEAKED policy into frontmatter" || echo "frontmatter clean"
+```
+
+Expected: "frontmatter key OK" and "frontmatter clean" (the policy must not
+appear in the frontmatter).
+
+Confirm the share path materializes the same file:
+
+```bash
+SHARE_TMP=$(mktemp -d)
+$LOADOUT share signal-flare --out "$SHARE_TMP"
+tar -xzf "$SHARE_TMP"/signal-flare*.tar.gz -C "$SHARE_TMP"
+grep -q 'allow_implicit_invocation: false' "$SHARE_TMP/codex-build/agents/openai.yaml" && echo "share policy OK"
+rm -rf "$SHARE_TMP"
+```
+
+Expected: prints "share policy OK". Clean up by unequipping:
+
+```bash
+$LOADOUT unequip signal-flare --target codex
+ls "$SF_DIR" 2>&1 || true
+```
+
+Expected: the skill directory no longer exists.
+
+### 5. Sync
 
 ```bash
 $LOADOUT sync
@@ -87,7 +175,7 @@ $LOADOUT sync
 
 Expected: repo pull succeeds, any outdated managed installs are refreshed. If nothing is outdated, that's fine — the command should still complete without error.
 
-### 5. Doctor
+### 6. Doctor
 
 ```bash
 $LOADOUT doctor
@@ -95,7 +183,7 @@ $LOADOUT doctor
 
 Expected: all checks pass. If any check fails, investigate and fix before proceeding.
 
-### 6. Import
+### 7. Import
 
 Create a temporary skill fixture and import it.
 
@@ -135,12 +223,12 @@ Verify with `$LOADOUT inventory` that `temp-shakedown-import` appears.
 Verify that the extra file was preserved in the repo:
 
 ```bash
-ls "$(grep -o '"repo_path": *"[^"]*"' ~/.config/loadout/config.json | sed 's/"repo_path": *"//;s/"//')/skills/temp-shakedown-import/references/notes.md"
+ls "$(cfg_repo_path)/skills/temp-shakedown-import/references/notes.md"
 ```
 
 Expected: the file exists. If missing, the import did not preserve extra files.
 
-### 7. Delete
+### 8. Delete
 
 First, verify that the interactive confirmation prompt works by running delete without `--force`. This should fail with a non-zero exit because there is no interactive input to provide:
 
@@ -162,7 +250,7 @@ Verify with `$LOADOUT inventory` that it no longer appears. Clean up the temp di
 rm -rf "$IMPORT_TMP"
 ```
 
-### 8. Project-scoped Flow
+### 9. Project-scoped Flow
 
 Test project-local installation by creating a temporary project directory. The directory must be a git repo with `.claude/` and `.codex/` directories for project scope resolution to work.
 
@@ -190,13 +278,13 @@ cd "$LOADOUT_DIR"
 rm -rf "$PROJECT_TMP"
 ```
 
-### 9. Init (Fresh Setup)
+### 10. Init (Fresh Setup)
 
-Back up the current config and state, then test `init` with temporary target directories.
+Back up the current config and state, then test `init` with temporary target directories. `loadout init` writes `config.toml`, so back up that file (not the legacy `config.json` backup) — otherwise this test would overwrite your live config with no way to restore it.
 
 ```bash
 CONFIG_DIR="$HOME/.config/loadout"
-cp "$CONFIG_DIR/config.json" "$CONFIG_DIR/config.json.bak"
+cp "$CONFIG_DIR/config.toml" "$CONFIG_DIR/config.toml.bak"
 
 INIT_TMP=$(mktemp -d)
 $LOADOUT init --repo "$INIT_TMP/repo" --targets claude,codex --claude-skills "$INIT_TMP/claude-skills" --codex-skills "$INIT_TMP/codex-skills"
@@ -205,16 +293,16 @@ $LOADOUT init --repo "$INIT_TMP/repo" --targets claude,codex --claude-skills "$I
 Verify that init completed by checking the config file exists. Note: `$LOADOUT doctor` will show warnings after a fresh init because the new local repo has no remote upstream and previously installed skills won't be in the new registry — this is expected. Then restore the originals:
 
 ```bash
-cp "$CONFIG_DIR/config.json.bak" "$CONFIG_DIR/config.json"
-rm "$CONFIG_DIR/config.json.bak"
+cp "$CONFIG_DIR/config.toml.bak" "$CONFIG_DIR/config.toml"
+rm "$CONFIG_DIR/config.toml.bak"
 rm -rf "$INIT_TMP"
 ```
 
-### 10. Filesystem Safety
+### 11. Filesystem Safety
 
 Test that Loadout refuses to destroy unmanaged directories and rejects symlinks in skill trees. All fixtures use isolated temp directories with explicit cleanup.
 
-#### 10a. Unmanaged Install Target Protection
+#### 11a. Unmanaged Install Target Protection
 
 Create a same-name directory without a `.loadout` marker in a temp target root, then attempt to equip a skill into it.
 
@@ -228,7 +316,7 @@ echo "user data" > "$SAFETY_TARGET/temp-shakedown-import/precious.txt"
 Pick any skill from the repo that supports claude. Attempt to install it using the CLI with the temp target. Since `equip` installs to the configured target root (not an arbitrary path), test this at the Go level by invoking `install.Install` directly. Instead, use the simpler approach — pre-create a conflicting directory in the real claude skills path, attempt equip, and verify the error:
 
 ```bash
-CLAUDE_ROOT=$(jq -r '.targets.claude.path' ~/.config/loadout/config.json)
+CLAUDE_ROOT=$(cfg_target_path claude)
 CONFLICT_SKILL="test-skill"  # pick a real skill from inventory
 mkdir -p "$CLAUDE_ROOT/$CONFLICT_SKILL"
 echo "precious" > "$CLAUDE_ROOT/$CONFLICT_SKILL/user-file.txt"
@@ -248,7 +336,7 @@ Expected: prints "precious". Clean up:
 rm -rf "$CLAUDE_ROOT/$CONFLICT_SKILL"
 ```
 
-#### 10b. Unmanaged Remove Protection
+#### 11b. Unmanaged Remove Protection
 
 Same pattern — create an unmanaged directory and attempt unequip:
 
@@ -271,7 +359,7 @@ Expected: prints "keep me". Clean up:
 rm -rf "$CLAUDE_ROOT/$CONFLICT_SKILL"
 ```
 
-#### 10c. Import Symlink Rejection
+#### 11c. Import Symlink Rejection
 
 Create a temp skill fixture with a valid SKILL.md plus a symlinked file, then attempt import.
 
@@ -301,7 +389,7 @@ $LOADOUT import "$SYMLINK_TMP/symlink-test-skill" 2>&1 || true
 Expected: import fails with an error mentioning "symlink". Verify no repo copy was created:
 
 ```bash
-REPO_PATH=$(jq -r '.repo_path' ~/.config/loadout/config.json)
+REPO_PATH=$(cfg_repo_path)
 ls "$REPO_PATH/skills/symlink-test-skill" 2>&1 || true
 ```
 
@@ -311,7 +399,7 @@ Expected: directory does not exist. Clean up:
 rm -rf "$SYMLINK_TMP"
 ```
 
-#### 10d. Install Symlink Rejection
+#### 11d. Install Symlink Rejection
 
 Create a repo skill fixture containing a symlink, then attempt to install from it.
 

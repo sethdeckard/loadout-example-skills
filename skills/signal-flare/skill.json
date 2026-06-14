@@ -1,6 +1,6 @@
 {
   "name": "signal-flare",
-  "description": "An intentional Codex-only example that demonstrates a single-target skill with Codex metadata.",
+  "description": "An intentional Codex-only example: a single-target skill whose Codex metadata disables implicit model invocation.",
   "tags": [
     "demo",
     "codex",
@@ -10,6 +10,9 @@
     "codex"
   ],
   "codex": {
-    "approval-mode": "suggest"
+    "approval-mode": "suggest",
+    "policy": {
+      "allow_implicit_invocation": false
+    }
   }
 }

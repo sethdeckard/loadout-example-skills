@@ -101,6 +101,24 @@ disable-model-invocation: true
 
 If a target has no config object (or an empty `{}`), only `name` and `description` appear in the frontmatter.
 
+### Codex invocation policy
+
+Codex decides whether to invoke a skill on its own ("implicit invocation"). You control this from the `codex` block in `skill.json`. The native, preferred shape is:
+
+```json
+{
+  "name": "signal-flare",
+  "targets": ["codex"],
+  "codex": {
+    "policy": { "allow_implicit_invocation": false }
+  }
+}
+```
+
+`disable-model-invocation: true` is also accepted as a Claude-style compatibility alias (it maps to `allow_implicit_invocation: false`); when both are present, the native `policy` wins.
+
+Unlike other metadata, the policy is **not** written into the installed `SKILL.md` frontmatter. Loadout materializes it into `<skill>/agents/openai.yaml` on every Codex install and in shared `codex-build/` output, leaving any author-written fields in that file intact. See [signal-flare](skills/signal-flare/), which disables implicit invocation while keeping a normal `approval-mode` frontmatter key.
+
 ## What This Repo Demonstrates
 
 This repo intentionally centers three core structural patterns:
@@ -110,6 +128,7 @@ This repo intentionally centers three core structural patterns:
 | Shared skill, no target metadata | [field-rations](skills/field-rations/) | Demonstrates the simplest happy path |
 | Shared skill, per-target metadata | [debugging-compass](skills/debugging-compass/) | Demonstrates one skill with target-specific config |
 | Intentional single-target skill | [bardic-review](skills/bardic-review/) | Demonstrates that `targets` are explicit source truth and may be single-target |
+| Codex invocation policy | [signal-flare](skills/signal-flare/) | Demonstrates disabling Codex implicit invocation, materialized to `agents/openai.yaml` |
 
 Preferred authoring pattern:
 
@@ -122,7 +141,7 @@ Additional examples in the repo extend those patterns without introducing a new 
 
 - [watchfire-briefing](skills/watchfire-briefing/) is another simple shared skill
 - [warden-manual](skills/warden-manual/) shows that one target can have metadata while the other relies on default frontmatter
-- [signal-flare](skills/signal-flare/) demonstrates the reverse single-target case with a Codex-only skill
+- [signal-flare](skills/signal-flare/) demonstrates the reverse single-target case with a Codex-only skill, and disables Codex implicit invocation via `codex.policy.allow_implicit_invocation` (materialized to `agents/openai.yaml` on install)
 - [loadout-smith](skills/loadout-smith/) demonstrates the preferred in-repo authoring workflow for creating a new Loadout skill and is useful in practice when you want an agent to scaffold one correctly
 
 [loadout-smith](skills/loadout-smith/) and [shakedown-run](skills/shakedown-run/) are also genuinely useful skills, not just demos. `loadout-smith` helps an agent author a valid new skill in-repo, while `shakedown-run` runs a full end-to-end validation of the Loadout CLI itself, exercising every command and fixing issues found along the way.
@@ -140,7 +159,7 @@ Plain markdown containing the skill instructions. This is the file that gets ins
 | [bardic-review](skills/bardic-review/) | claude | Claude-only metadata example | Intentional single-target skill |
 | [watchfire-briefing](skills/watchfire-briefing/) | claude, codex | No target config | Another shared item in the same theme |
 | [warden-manual](skills/warden-manual/) | claude, codex | Claude metadata only | Shared skill where only one target has extra config |
-| [signal-flare](skills/signal-flare/) | codex | Codex-only metadata example | Reverse single-target case |
+| [signal-flare](skills/signal-flare/) | codex | Codex-only metadata + invocation policy | Reverse single-target case; disables Codex implicit invocation |
 | [loadout-smith](skills/loadout-smith/) | claude, codex | No target config | Useful in-repo authoring example for new Loadout-compatible skills |
 | [shakedown-run](skills/shakedown-run/) | claude, codex | Both targets have allowed-tools | End-to-end validation of the Loadout CLI |
 

@@ -24,6 +24,10 @@ Create or update a skill directly under `skills/<name>/` so it follows Loadout's
 
 Use those references when deciding which frontmatter belongs in the shared skill body versus which keys should live under the `claude` or `codex` metadata blocks in `skill.json`.
 
+## Codex Invocation Policy
+
+To control whether Codex invokes a skill on its own, declare the policy in the `codex` block of `skill.json` — do not hand-write the policy file. Use the native shape `codex.policy.allow_implicit_invocation` (preferred); `disable-model-invocation: true` is accepted as a Claude-style alias. Loadout materializes this into `<skill>/agents/openai.yaml` on Codex install and keeps it out of the installed `SKILL.md` frontmatter.
+
 ## Output Requirements
 
 - `skill.json` must be valid JSON.
